@@ -33,8 +33,10 @@
     >
       <template #columns>
         <a-table-column title="状态" :width="70" align="center">
-          <template #cell>
-            <div class="online-dot"></div>
+          <template #cell="{ record }">
+            <a-tag :color="getStatusTagColor(record.status)" size="small">
+              {{ getStatusLabel(record.status) }}
+            </a-tag>
           </template>
         </a-table-column>
         <a-table-column title="名称" data-index="name" :width="160" />
@@ -47,6 +49,11 @@
           </template>
         </a-table-column>
         <a-table-column title="浏览器" data-index="browser_type" :width="100" />
+        <a-table-column title="版本" :width="90">
+          <template #cell="{ record }">
+            <span class="version-text">{{ record.version || '-' }}</span>
+          </template>
+        </a-table-column>
         <a-table-column title="无头模式" :width="90" align="center">
           <template #cell="{ record }">
             <a-tag :color="record.headless ? 'orangered' : 'green'" size="small">
@@ -62,6 +69,11 @@
         <a-table-column title="DEBUG" :width="80" align="center">
           <template #cell="{ record }">
             <a-switch v-model="record.debug" size="small" disabled />
+          </template>
+        </a-table-column>
+        <a-table-column title="最近心跳" :width="170">
+          <template #cell="{ record }">
+            <span class="time-text">{{ formatTime(record.last_seen_at || record.connected_at) }}</span>
           </template>
         </a-table-column>
         <a-table-column title="连接时间" :width="170">
@@ -118,6 +130,28 @@ const getTypeTagColor = (type: string) => {
     pytest_web: 'purple',
   }
   return typeMap[type] || 'gray'
+}
+
+const getStatusLabel = (status: string) => {
+  const statusMap: Record<string, string> = {
+    online: '在线',
+    expired: '过期',
+    unauthenticated: '未认证',
+    offline: '离线',
+    unknown: '未知',
+  }
+  return statusMap[status] || status || '-'
+}
+
+const getStatusTagColor = (status: string) => {
+  const statusMap: Record<string, string> = {
+    online: 'green',
+    expired: 'orangered',
+    unauthenticated: 'gold',
+    offline: 'gray',
+    unknown: 'gray',
+  }
+  return statusMap[status] || 'gray'
 }
 
 const formatTime = (isoString: string) => {

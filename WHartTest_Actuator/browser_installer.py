@@ -7,6 +7,7 @@
 
 import logging
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -17,8 +18,13 @@ logger = logging.getLogger('actuator.browser')
 def get_exe_dir() -> Path:
     """获取 exe 所在目录或脚本所在目录"""
     if getattr(sys, 'frozen', False):
-        # 打包后的 exe
-        return Path(sys.executable).parent
+        executable_path = Path(sys.executable).resolve()
+        if sys.platform == 'darwin':
+            # Finder 启动 .app 时，资源目录位于应用包旁边。
+            for parent in executable_path.parents:
+                if parent.name.endswith('.app'):
+                    return parent.parent
+        return executable_path.parent
     else:
         # 开发环境
         return Path(__file__).parent
@@ -27,6 +33,58 @@ def get_exe_dir() -> Path:
 def get_browser_path() -> Path:
     """获取浏览器存储路径（相对于 exe 目录）"""
     return get_exe_dir() / "browsers"
+
+
+def get_runtime_dir() -> Path:
+    """Return the writable per-user directory used by installed macOS apps."""
+    if getattr(sys, 'frozen', False) and sys.platform == 'darwin':
+        return Path.home() / "Library" / "Application Support" / "WHartTest" / "Actuator"
+    return get_exe_dir()
+
+
+def get_config_path(config_path: str = "config.toml") -> Path:
+    """Resolve and initialize the writable runtime configuration path."""
+    path = Path(config_path).expanduser()
+    if path.is_absolute() or not getattr(sys, 'frozen', False) or sys.platform != 'darwin':
+        return path if path.is_absolute() else get_exe_dir() / path
+
+    runtime_path = get_runtime_dir() / path
+    if not runtime_path.exists():
+        runtime_path.parent.mkdir(parents=True, exist_ok=True)
+        for source in (get_exe_dir() / path, get_exe_dir() / "config.example.toml"):
+            if source.is_file():
+                shutil.copy2(source, runtime_path)
+                break
+    return runtime_path
+
+
+def get_browser_executable_path(browser_type: str = 'chromium') -> Path | None:
+    """Find the bundled browser executable for the current platform."""
+    browser_path = get_browser_path()
+    if not browser_path.exists() or browser_type != 'chromium':
+        return None
+
+    if sys.platform == 'darwin':
+        patterns = (
+            'chromium-*/chrome-mac/Chromium.app/Contents/MacOS/Chromium',
+            'chromium-*/chrome-mac/Chromium.app/Contents/MacOS/chromium',
+        )
+    elif sys.platform == 'win32':
+        patterns = (
+            'chromium-*/chrome-win*/chrome.exe',
+            'chromium-*/chrome-win*/chrome',
+        )
+    else:
+        patterns = (
+            'chromium-*/chrome-linux*/chrome',
+            'chromium-*/chrome-linux*/chrome-wrapper',
+        )
+
+    for pattern in patterns:
+        for candidate in sorted(browser_path.glob(pattern)):
+            if candidate.is_file():
+                return candidate
+    return None
 
 
 def setup_playwright_env() -> None:

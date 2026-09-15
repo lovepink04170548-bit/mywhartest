@@ -108,6 +108,8 @@ psycopg[binary]==3.3.1
 # LangChain MCP适配器 - MIT许可证 (v1.x 重大升级)
 # https://github.com/langchain-ai/langchain-mcp-adapters/blob/main/LICENSE
 langchain-mcp-adapters==0.2.1
+# mcp 2.x 移除了 langchain-mcp-adapters 0.2.1 仍在导入的 RequestContext
+mcp==1.28.1
 
 # Excel文件处理 - MIT许可证 (当前版本: 3.1.5)
 # https://github.com/theorchard/openpyxl/blob/master/LICENCE.rst

@@ -664,7 +664,7 @@ const runTestCase = async (record: UiTestCase) => {
     }
   }
 
-  // 连接 WebSocket
+  // 连接 WebSocket 接收结果事件；执行命令走后端持久化入口。
   try {
     await uiWebSocket.connect()
   } catch {
@@ -672,17 +672,19 @@ const runTestCase = async (record: UiTestCase) => {
     return
   }
 
-  // 发送执行命令（包含执行器ID）
   executingIds.value.push(record.id)
-  const success = uiWebSocket.runTestCase(record.id, selectedEnvConfig.value, selectedActuator.value)
-  if (success) {
+  try {
+    await testCaseApi.execute(record.id, {
+      env_config_id: selectedEnvConfig.value,
+      actuator_id: selectedActuator.value,
+    })
     Message.info(pageText.value.startedCase(record.name))
-    // 立即更新本地状态为"执行中"
     const idx = testcaseData.value.findIndex(tc => tc.id === record.id)
     if (idx !== -1) {
-      testcaseData.value[idx].status = 1  // 执行中
+      testcaseData.value[idx].status = 1
     }
-  } else {
+    fetchTestCases()
+  } catch {
     Message.error(pageText.value.runCommandFailed)
     executingIds.value = executingIds.value.filter(id => id !== record.id)
   }

@@ -26,14 +26,37 @@ from typing import Any
 
 # 添加当前目录到路径（支持打包后运行）
 if getattr(sys, 'frozen', False):
-    # 打包后的 exe
-    _base_path = Path(sys.executable).parent
+    _bootstrap_path = Path(sys.executable).parent
 else:
-    _base_path = Path(__file__).parent
-sys.path.insert(0, str(_base_path))
+    _bootstrap_path = Path(__file__).parent
+sys.path.insert(0, str(_bootstrap_path))
 
 # 导入浏览器安装模块（必须在其他模块之前）
-from browser_installer import setup_playwright_env, ensure_browser
+from browser_installer import get_exe_dir, setup_playwright_env, ensure_browser
+
+try:
+    from browser_installer import get_config_path, get_runtime_dir
+except ImportError:
+    def get_runtime_dir() -> Path:
+        return get_exe_dir()
+
+    def get_config_path(config_path: str = "config.toml") -> Path:
+        path = Path(config_path).expanduser()
+        return path if path.is_absolute() else get_exe_dir() / path
+
+try:
+    from browser_installer import get_browser_executable_path
+except ImportError:
+    # Keep lightweight test doubles and older bundled modules compatible.
+    def get_browser_executable_path(browser_type: str = 'chromium') -> Path | None:
+        return None
+
+_base_path = get_exe_dir()
+_runtime_path = get_runtime_dir()
+if getattr(sys, 'frozen', False):
+    # macOS .pkg 安装到 /Applications 后，运行数据必须写入用户目录。
+    _runtime_path.mkdir(parents=True, exist_ok=True)
+    os.chdir(_runtime_path)
 
 from websocket_client import WebSocketClient
 from consumer import TaskConsumer
@@ -57,10 +80,12 @@ class Config:
         # 打包成 exe 时默认启用 GUI 登录，开发模式默认关闭
         self.use_gui = getattr(sys, 'frozen', False)
         self.api_username = "admin"
-        self.api_password = "admin123"
+        self.api_password = "admin123456"
         self.actuator_id: str | None = None
         self.actuator_name: str | None = None
         self.actuator_description: str | None = None
+        self.registration_token: str | None = os.environ.get("UI_ACTUATOR_REGISTRATION_TOKEN")
+        self.heartbeat_interval = 30.0
         
         # 浏览器配置
         self.browser_type = "chromium"
@@ -69,6 +94,7 @@ class Config:
         self.user_data_dir = "./data/browser"
         self.launch_timeout = 30
         self.action_timeout = 30
+        self.ignore_https_errors = True
         
         # 执行配置
         self.retry_count = 3
@@ -82,10 +108,34 @@ class Config:
         self.trace_screenshots = True
         self.trace_snapshots = True
         self.trace_sources = False
+
+        # MCP 配置：默认使用原生 Playwright 采集，官方 MCP 作为实验通道按需启用。
+        self.mcp_provider = "playwright-native"
+        self.mcp_transport = "stdio"
+        self.mcp_command = "npx"
+        self.mcp_args = [
+            "-y", "@playwright/mcp@latest", "--port", "8931", "--host", "127.0.0.1",
+            "--caps=vision,pdf,devtools", "--headless", "--ignore-https-errors",
+        ]
+        bundled_browser = get_browser_executable_path()
+        if bundled_browser:
+            self.mcp_args.extend(["--executable-path", str(bundled_browser)])
+        self.mcp_cwd: str | None = None
+        self.mcp_server_url: str | None = "http://127.0.0.1:8931/mcp"
+
+        # TypeScript Playwright spec 真实执行配置
+        self.typescript_spec_enabled = True
+        self.typescript_spec_timeout = 120
+        self.typescript_spec_allow_npx = True
+        self.typescript_spec_command: str | None = None
         
         # 日志配置
         self.log_level = "INFO"
-        self.log_file: str | None = None
+        self.log_file: str | None = (
+            str(_runtime_path / "data" / "logs" / "actuator.log")
+            if getattr(sys, 'frozen', False)
+            else None
+        )
     
     def load_from_toml(self, filepath: str) -> None:
         """从TOML文件加载配置"""
@@ -108,6 +158,11 @@ class Config:
             self.use_gui = data['server'].get('use_gui', self.use_gui)
             self.api_username = data['server'].get('api_username', self.api_username)
             self.api_password = data['server'].get('api_password', self.api_password)
+            self.registration_token = data['server'].get('registration_token', self.registration_token)
+            try:
+                self.heartbeat_interval = float(data['server'].get('heartbeat_interval', self.heartbeat_interval))
+            except (TypeError, ValueError):
+                pass
         
         # 执行器配置
         if 'actuator' in data:
@@ -123,6 +178,7 @@ class Config:
             self.user_data_dir = browser.get('user_data_dir', self.user_data_dir)
             self.launch_timeout = browser.get('launch_timeout', self.launch_timeout)
             self.action_timeout = browser.get('action_timeout', self.action_timeout)
+            self.ignore_https_errors = browser.get('ignore_https_errors', self.ignore_https_errors)
         
         # 执行配置
         if 'execution' in data:
@@ -140,6 +196,22 @@ class Config:
             self.trace_screenshots = trace.get('screenshots', self.trace_screenshots)
             self.trace_snapshots = trace.get('snapshots', self.trace_snapshots)
             self.trace_sources = trace.get('sources', self.trace_sources)
+
+        if 'mcp' in data:
+            mcp = data['mcp']
+            self.mcp_provider = mcp.get('provider', self.mcp_provider)
+            self.mcp_transport = mcp.get('transport', self.mcp_transport)
+            self.mcp_command = mcp.get('command', self.mcp_command)
+            self.mcp_args = mcp.get('args', self.mcp_args)
+            self.mcp_cwd = mcp.get('cwd', self.mcp_cwd)
+            self.mcp_server_url = mcp.get('server_url', self.mcp_server_url)
+
+        if 'typescript_spec' in data:
+            typescript_spec = data['typescript_spec']
+            self.typescript_spec_enabled = typescript_spec.get('enabled', self.typescript_spec_enabled)
+            self.typescript_spec_timeout = typescript_spec.get('timeout', self.typescript_spec_timeout)
+            self.typescript_spec_allow_npx = typescript_spec.get('allow_npx', self.typescript_spec_allow_npx)
+            self.typescript_spec_command = typescript_spec.get('command', self.typescript_spec_command)
         
         # 日志配置
         if 'logging' in data:
@@ -229,9 +301,17 @@ def parse_args():
     return parser.parse_args()
 
 
+def resolve_config_path(config_path: str) -> str:
+    """Resolve the writable config beside a frozen app installation."""
+    if getattr(sys, 'frozen', False):
+        return str(get_config_path(config_path))
+    return str(Path(config_path).expanduser())
+
+
 async def main():
     """主函数"""
     args = parse_args()
+    args.config = resolve_config_path(args.config)
     
     # 加载配置
     config = Config()
@@ -241,14 +321,10 @@ async def main():
     # 配置日志
     setup_logging(config.log_level, config.log_file)
     logger = logging.getLogger('actuator')
-    
-    # 检查并安装浏览器（首次运行时需要）
-    if not args.skip_browser_check:
-        logger.info("检查浏览器安装状态...")
-        if not ensure_browser(config.browser_type):
-            logger.error(f"浏览器 {config.browser_type} 安装失败，请检查网络连接后重试")
-            logger.error("或者手动运行: playwright install chromium")
-            sys.exit(1)
+
+    # 无论是否跳过浏览器安装检查，都必须设置浏览器路径。
+    # 否则 Playwright 会回退到 ~/.cache/ms-playwright，导致找不到项目内置浏览器。
+    setup_playwright_env()
     
     # GUI 登录模式
     if config.use_gui:
@@ -288,6 +364,7 @@ async def main():
         config.persistent = login_result.get('persistent', config.persistent)
         config.launch_timeout = login_result.get('launch_timeout', config.launch_timeout)
         config.action_timeout = login_result.get('action_timeout', config.action_timeout)
+        config.ignore_https_errors = login_result.get('ignore_https_errors', config.ignore_https_errors)
         # 更新执行配置
         config.retry_count = login_result.get('retry_count', config.retry_count)
         config.step_interval = login_result.get('step_interval', config.step_interval)
@@ -299,8 +376,18 @@ async def main():
         config.trace_sources = login_result.get('trace_sources', config.trace_sources)
         # 更新日志配置
         config.log_level = login_result.get('log_level', config.log_level)
+        logging.getLogger().setLevel(getattr(logging, config.log_level.upper()))
         
         logger.info(f"登录成功: {config.api_username} @ {config.api_url}")
+
+    # 检查并安装浏览器（首次运行时需要）。
+    # GUI 模式下必须在登录窗口完成后再检查，避免内网离线/浏览器包异常时用户只看到控制台。
+    if not args.skip_browser_check:
+        logger.info("检查浏览器安装状态...")
+        if not ensure_browser(config.browser_type):
+            logger.error(f"浏览器 {config.browser_type} 安装失败，请检查网络连接后重试")
+            logger.error("或者手动运行: playwright install chromium")
+            sys.exit(1)
     
     # 生成执行器ID
     actuator_id = config.actuator_id or f"actuator-{os.getpid()}"
@@ -314,6 +401,9 @@ async def main():
     logger.info(f"API服务器: {config.api_url}")
     logger.info(f"浏览器类型: {config.browser_type}")
     logger.info(f"无头模式: {config.headless}")
+    logger.info(f"忽略 HTTPS 证书错误: {config.ignore_https_errors}")
+    logger.info(f"MCP Provider: {config.mcp_provider}")
+    logger.info(f"MCP Server: {config.mcp_server_url}")
     logger.info("=" * 50)
     
     # 创建WebSocket客户端，传递配置

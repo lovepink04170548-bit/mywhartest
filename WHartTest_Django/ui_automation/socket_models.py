@@ -27,10 +27,15 @@ class UiSocketEnum:
     PAGE_STEP_RESULT = 'u_page_step_result'  # 页面步骤执行结果
     TEST_CASE = 'u_test_case'             # 执行测试用例
     TEST_CASE_BATCH = 'u_test_case_batch' # 批量执行用例
+    AI_GENERATION = 'u_ai_generation'     # Playwright MCP AI 生成/验证/修复
+    AI_GENERATION_ACK = 'u_ai_generation_ack'  # AI 生成任务入队确认
+    AI_GENERATION_RESULT = 'u_ai_generation_result'  # AI 生成任务结果
+    ELEMENT_MAP_MANUAL_CAPTURE = 'u_element_map_manual_capture'  # 人工采集元素地图
     STOP_EXECUTION = 'u_stop_execution'   # 停止执行
     STEP_RESULT = 'u_step_result'         # 步骤执行结果
     CASE_RESULT = 'u_case_result'         # 用例执行结果
     SET_ACTUATOR_INFO = 't_set_actuator_info'  # 设置执行器信息
+    ACTUATOR_HEARTBEAT = 't_actuator_heartbeat'  # 执行器心跳
 
 
 class QueueModel(BaseModel):

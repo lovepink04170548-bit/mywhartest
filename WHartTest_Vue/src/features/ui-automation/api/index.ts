@@ -16,6 +16,10 @@ import type {
   UiCaseStepsDetailed,
   UiExecutionRecord,
   UiBatchExecutionRecord,
+  UiElementMap,
+  UiAiGenerationTask,
+  UiAiGenerationTaskForm,
+  UiAiReviewQueueItem,
   UiPublicData,
   UiEnvironmentConfig,
   UiModuleForm,
@@ -130,6 +134,12 @@ export const testCaseApi = {
 
   delete: (id: number) => request.delete(`${BASE_URL}/testcases/${id}/`),
 
+  execute: (id: number, data: { env_config_id?: number; actuator_id?: string }) =>
+    request.post<{ message: string; record_id: number; test_case_id: number; status: number }>(
+      `${BASE_URL}/testcases/${id}/execute/`,
+      data,
+    ),
+
   batchDelete: (ids: number[]) => request.post(`${BASE_URL}/testcases/batch-delete/`, { ids }),
 }
 
@@ -179,6 +189,114 @@ export const batchRecordApi = {
   delete: (id: number) => request.delete(`${BASE_URL}/batch-records/${id}/`),
 }
 
+// ==================== 元素地图 ====================
+export const elementMapApi = {
+  list: (params?: {
+    project?: number
+    environment_config?: number
+    status?: string
+    stale_status?: string
+    role_key?: string
+    permission_key?: string
+    version_group?: string
+    search?: string
+    page?: number
+    page_size?: number
+  }) =>
+    request.get<PaginatedResponse<UiElementMap>>(`${BASE_URL}/element-maps/`, { params }),
+
+  get: (id: number) => request.get<UiElementMap>(`${BASE_URL}/element-maps/${id}/`),
+
+  create: (data: Partial<UiElementMap>) =>
+    request.post<UiElementMap>(`${BASE_URL}/element-maps/`, data),
+
+  update: (id: number, data: Partial<UiElementMap>) =>
+    request.patch<UiElementMap>(`${BASE_URL}/element-maps/${id}/`, data),
+
+  confirm: (id: number) =>
+    request.post<UiElementMap>(`${BASE_URL}/element-maps/${id}/confirm/`),
+
+  startManualCapture: (data: {
+    project: number
+    environment_config?: number | null
+    base_url: string
+    name?: string
+    interval_ms?: number
+    max_duration_seconds?: number
+    actuator_id?: string
+  }) =>
+    request.post<{ message: string; dispatch_id: string; element_map: UiElementMap }>(
+      `${BASE_URL}/element-maps/manual-capture-start/`,
+      data,
+    ),
+
+  delete: (id: number) => request.delete(`${BASE_URL}/element-maps/${id}/`),
+
+  batchDelete: (ids: number[]) => request.post(`${BASE_URL}/element-maps/batch-delete/`, { ids }),
+}
+
+// ==================== AI 高成功率生成任务 ====================
+export const aiGenerationTaskApi = {
+  list: (params?: { project?: number; environment_config?: number; element_map?: number; status?: string; search?: string }) =>
+    request.get<PaginatedResponse<UiAiGenerationTask>>(`${BASE_URL}/ai-generation-tasks/`, { params }),
+
+  get: (id: number) => request.get<UiAiGenerationTask>(`${BASE_URL}/ai-generation-tasks/${id}/`),
+
+  getDetailPayload: (
+    id: number,
+    field: 'test_plan' | 'mcp_observations' | 'element_map_snapshot' | 'generated_case' | 'generated_script' | 'verification_result' | 'repair_history',
+  ) =>
+    request.get<{
+      field: string
+      value: unknown
+    }>(`${BASE_URL}/ai-generation-tasks/${id}/detail-payload/`, { params: { field } }),
+
+  create: (data: UiAiGenerationTaskForm) =>
+    request.post<UiAiGenerationTask>(`${BASE_URL}/ai-generation-tasks/`, data),
+
+  update: (id: number, data: Partial<UiAiGenerationTaskForm>) =>
+    request.patch<UiAiGenerationTask>(`${BASE_URL}/ai-generation-tasks/${id}/`, data),
+
+  start: (id: number, payload?: { actuator_id?: string }) =>
+    request.post<{ message: string; task: UiAiGenerationTask }>(`${BASE_URL}/ai-generation-tasks/${id}/start/`, payload || {}),
+
+  applyToUiCase: (id: number) =>
+    request.post<{
+      message: string
+      module_id: number
+      page_id: number
+      page_step_id: number
+      test_case_id: number
+      task: UiAiGenerationTask
+    }>(`${BASE_URL}/ai-generation-tasks/${id}/apply-to-ui-case/`),
+
+  getReviewQueue: (id: number) =>
+    request.get<{
+      task_id: number
+      element_map_id: number | null
+      pending_count: number
+      items: UiAiReviewQueueItem[]
+    }>(`${BASE_URL}/ai-generation-tasks/${id}/review-queue/`),
+
+  resolveReviewQueue: (id: number, payload: { action: 'approve' | 'reject'; indexes?: number[]; comment?: string }) =>
+    request.post<{
+      message: string
+      processed: number[]
+      errors: Array<{ index: number; error: string }>
+      pending_count: number
+      task: UiAiGenerationTask
+      element_map_id: number | null
+    }>(`${BASE_URL}/ai-generation-tasks/${id}/review-queue/resolve/`, payload),
+
+  downloadArtifact: (id: number, type: 'html' | 'junit' | 'json' | 'ts' | 'ts_bundle' | 'python') =>
+    request.get<Blob>(`${BASE_URL}/ai-generation-tasks/${id}/download-artifact/`, {
+      params: { type },
+      responseType: 'blob',
+    }),
+
+  delete: (id: number) => request.delete(`${BASE_URL}/ai-generation-tasks/${id}/`),
+}
+
 // ==================== 公共数据管理 ====================
 export const publicDataApi = {
   list: (params?: { project?: number; type?: number; is_enabled?: boolean; search?: string }) =>
@@ -221,12 +339,39 @@ export interface ActuatorInfo {
   browser_type: string
   headless: boolean
   connected_at: string
+  last_seen_at?: string
+  version?: string
+  authenticated?: boolean
+  status?: string
+  online_ttl_seconds?: number
 }
 
 export interface ActuatorStatus {
   total_actuators: number
+  available_actuators?: number
   has_available: boolean
   web_users: number
+}
+
+export interface ActuatorPackageInfo {
+  platform: 'windows' | 'linux' | 'macos' | string
+  url: string
+  sha256: string
+  file_name: string
+  available: boolean
+}
+
+export interface ActuatorOnboardingInfo {
+  api_url: string
+  ws_url: string
+  registration_token_required: boolean
+  registration_token: string
+  online_ttl_seconds: number
+  heartbeat_interval_seconds: number
+  packages: ActuatorPackageInfo[]
+  install_steps: Array<{ title: string; content: string }>
+  config_template: string
+  notes: string[]
 }
 
 export const actuatorApi = {
@@ -234,4 +379,6 @@ export const actuatorApi = {
     request.get<{ count: number; items: ActuatorInfo[] }>(`${BASE_URL}/actuators/list_actuators/`),
 
   status: () => request.get<ActuatorStatus>(`${BASE_URL}/actuators/status/`),
+
+  onboarding: () => request.get<ActuatorOnboardingInfo>(`${BASE_URL}/actuators/onboarding/`),
 }

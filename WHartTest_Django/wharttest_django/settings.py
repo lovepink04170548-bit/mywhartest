@@ -59,6 +59,20 @@ def setup_huggingface_env():
 setup_huggingface_env()
 
 
+def _env_bool(name: str, default: bool = False) -> bool:
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _env_int(name: str, default: int) -> int:
+    try:
+        return int(os.environ.get(name, str(default)))
+    except (TypeError, ValueError):
+        return default
+
+
 # 开发环境快速启动配置（不适用于生产）
 # 参考：https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
@@ -99,6 +113,30 @@ else:
         "localhost",
         "127.0.0.1",
     ]
+
+
+UI_ACTUATOR_REGISTRATION_TOKEN = os.environ.get("UI_ACTUATOR_REGISTRATION_TOKEN", "")
+UI_ACTUATOR_REGISTRATION_TOKEN_REQUIRED = _env_bool(
+    "UI_ACTUATOR_REGISTRATION_TOKEN_REQUIRED",
+    default=not DEBUG,
+)
+UI_ACTUATOR_ONLINE_TTL_SECONDS = _env_int("UI_ACTUATOR_ONLINE_TTL_SECONDS", 90)
+UI_ACTUATOR_HEARTBEAT_INTERVAL_SECONDS = _env_int("UI_ACTUATOR_HEARTBEAT_INTERVAL_SECONDS", 30)
+UI_ACTUATOR_PACKAGE_WINDOWS_URL = os.environ.get("UI_ACTUATOR_PACKAGE_WINDOWS_URL", "")
+UI_ACTUATOR_PACKAGE_WINDOWS_SHA256 = os.environ.get("UI_ACTUATOR_PACKAGE_WINDOWS_SHA256", "")
+UI_ACTUATOR_PACKAGE_WINDOWS_FILE_NAME = os.environ.get(
+    "UI_ACTUATOR_PACKAGE_WINDOWS_FILE_NAME",
+    "WHartTest_Actuator_Installer.exe",
+)
+UI_ACTUATOR_PACKAGE_MACOS_FILE_NAME = os.environ.get(
+    "UI_ACTUATOR_PACKAGE_MACOS_FILE_NAME",
+    "WHartTest_Actuator_MacOS.pkg",
+)
+UI_ACTUATOR_PACKAGE_DIR = os.environ.get("UI_ACTUATOR_PACKAGE_DIR", "")
+UI_ACTUATOR_PACKAGE_LINUX_URL = os.environ.get("UI_ACTUATOR_PACKAGE_LINUX_URL", "")
+UI_ACTUATOR_PACKAGE_LINUX_SHA256 = os.environ.get("UI_ACTUATOR_PACKAGE_LINUX_SHA256", "")
+UI_ACTUATOR_PACKAGE_MACOS_URL = os.environ.get("UI_ACTUATOR_PACKAGE_MACOS_URL", "")
+UI_ACTUATOR_PACKAGE_MACOS_SHA256 = os.environ.get("UI_ACTUATOR_PACKAGE_MACOS_SHA256", "")
 
 
 # 应用定义

@@ -12,6 +12,12 @@
         <a-tab-pane key="testcases" :title="tl('测试用例')">
           <TestCaseList ref="testCaseListRef" :selected-module-id="selectedModuleId" />
         </a-tab-pane>
+        <a-tab-pane key="ai-generation" :title="tl('AI生成用例')">
+          <AiGenerationTaskList ref="aiGenerationTaskListRef" />
+        </a-tab-pane>
+        <a-tab-pane key="element-maps" :title="tl('元素地图')">
+          <ElementMapVersionList ref="elementMapVersionListRef" />
+        </a-tab-pane>
         <a-tab-pane key="execution-records" :title="tl('执行记录')">
           <ExecutionRecordList ref="executionRecordListRef" />
         </a-tab-pane>
@@ -23,6 +29,9 @@
         </a-tab-pane>
         <a-tab-pane key="env-config" :title="tl('环境配置')">
           <EnvConfigList ref="envConfigListRef" />
+        </a-tab-pane>
+        <a-tab-pane key="actuator-onboarding" :title="tl('接入指南')">
+          <ActuatorOnboarding ref="actuatorOnboardingRef" />
         </a-tab-pane>
         <a-tab-pane key="actuators" :title="tl('执行器')">
           <ActuatorList ref="actuatorListRef" />
@@ -39,10 +48,13 @@ import ModulePanel from '../components/ModulePanel.vue'
 import PageList from './PageList.vue'
 import PageStepList from './PageStepList.vue'
 import TestCaseList from './TestCaseList.vue'
+import AiGenerationTaskList from './AiGenerationTaskList.vue'
+import ElementMapVersionList from './ElementMapVersionList.vue'
 import ExecutionRecordList from './ExecutionRecordList.vue'
 import BatchRecordList from './BatchRecordList.vue'
 import PublicDataList from './PublicDataList.vue'
 import EnvConfigList from './EnvConfigList.vue'
+import ActuatorOnboarding from './ActuatorOnboarding.vue'
 import ActuatorList from './ActuatorList.vue'
 import type { UiModule } from '../types'
 
@@ -54,12 +66,15 @@ const selectedModuleId = ref<number | undefined>(undefined)
 const pageListRef = ref()
 const pageStepListRef = ref()
 const testCaseListRef = ref()
+const aiGenerationTaskListRef = ref()
+const elementMapVersionListRef = ref()
 const executionRecordListRef = ref()
 const batchRecordListRef = ref()
 const publicDataListRef = ref()
 const envConfigListRef = ref()
+const actuatorOnboardingRef = ref()
 const actuatorListRef = ref()
-void [modulePanelRef, pageListRef, pageStepListRef, testCaseListRef, executionRecordListRef, batchRecordListRef, publicDataListRef, envConfigListRef, actuatorListRef]
+void [modulePanelRef, pageListRef, pageStepListRef, testCaseListRef, aiGenerationTaskListRef, elementMapVersionListRef, executionRecordListRef, batchRecordListRef, publicDataListRef, envConfigListRef, actuatorOnboardingRef, actuatorListRef]
 
 // 页签切换时刷新对应数据
 watch(activeTab, (newTab) => {
@@ -73,6 +88,12 @@ watch(activeTab, (newTab) => {
     case 'testcases':
       testCaseListRef.value?.refresh?.()
       break
+    case 'ai-generation':
+      aiGenerationTaskListRef.value?.refresh?.()
+      break
+    case 'element-maps':
+      elementMapVersionListRef.value?.refresh?.()
+      break
     case 'execution-records':
       executionRecordListRef.value?.refresh?.()
       break
@@ -84,6 +105,9 @@ watch(activeTab, (newTab) => {
       break
     case 'env-config':
       envConfigListRef.value?.refresh?.()
+      break
+    case 'actuator-onboarding':
+      actuatorOnboardingRef.value?.refresh?.()
       break
     case 'actuators':
       actuatorListRef.value?.refresh?.()

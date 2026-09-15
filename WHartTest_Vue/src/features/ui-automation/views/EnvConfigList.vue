@@ -106,6 +106,29 @@
             </a-form-item>
           </a-col>
         </a-row>
+        <a-form-item label="HTTPS 证书">
+          <a-switch v-model="ignoreHttpsErrors" checked-text="忽略错误" unchecked-text="严格校验" />
+        </a-form-item>
+        <a-divider>登录认证</a-divider>
+        <a-form-item label="自动登录">
+          <a-switch v-model="loginEnabled" checked-text="启用" unchecked-text="关闭" />
+        </a-form-item>
+        <a-row v-if="loginEnabled" :gutter="16">
+          <a-col :span="12">
+            <a-form-item field="login_username" label="登录账号" required>
+              <a-input v-model="formData.login_username" placeholder="用于自动探索登录后的业务页面" autocomplete="off" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item field="login_password" label="登录密码" :required="!formData.has_login_password">
+              <a-input-password
+                v-model="formData.login_password"
+                :placeholder="formData.has_login_password ? '留空则保留已配置密码' : '请输入登录密码'"
+                autocomplete="new-password"
+              />
+            </a-form-item>
+          </a-col>
+        </a-row>
         <a-row :gutter="16">
           <a-col :span="8">
             <a-form-item field="viewport_width" label="视口宽度">
@@ -259,6 +282,9 @@ const db2Config = reactive({
   schema: '',
 })
 
+const ignoreHttpsErrors = ref(true)
+const loginEnabled = ref(false)
+
 const filters = reactive({ browser: undefined as string | undefined, search: '' })
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showTotal: true, showPageSize: true })
 
@@ -277,6 +303,10 @@ const formData = reactive<UiEnvironmentConfigForm>({
   mysql_config: {},
   db2_config: {},
   extra_config: {},
+  login_enabled: false,
+  login_username: '',
+  login_password: '',
+  has_login_password: false,
   is_default: false,
 })
 
@@ -347,9 +377,15 @@ const resetForm = () => {
     db_type: 'mysql',
     mysql_config: {},
     db2_config: {},
-    extra_config: {},
+    extra_config: { ignore_https_errors: true },
+    login_enabled: false,
+    login_username: '',
+    login_password: '',
+    has_login_password: false,
     is_default: false,
   })
+  ignoreHttpsErrors.value = true
+  loginEnabled.value = false
   Object.assign(mysqlConfig, { host: '', port: 3306, user: '', password: '', database: '' })
   Object.assign(db2Config, { host: '', port: 50000, user: '', password: '', database: '', schema: '' })
   formRef.value?.clearValidate()
@@ -379,8 +415,14 @@ const editConfig = (record: UiEnvironmentConfig) => {
     mysql_config: record.mysql_config || {},
     db2_config: record.db2_config || {},
     extra_config: record.extra_config || {},
+    login_enabled: record.login_enabled || false,
+    login_username: record.login_username || '',
+    login_password: '',
+    has_login_password: record.has_login_password || false,
     is_default: record.is_default,
   })
+  ignoreHttpsErrors.value = record.extra_config?.ignore_https_errors !== false
+  loginEnabled.value = record.login_enabled || false
   const cfg = record.mysql_config || {}
   Object.assign(mysqlConfig, {
     host: cfg.host || '',
@@ -436,12 +478,28 @@ const handleSubmit = async (done: (closed: boolean) => void) => {
     done(false)
     return
   }
+  if (loginEnabled.value && !formData.login_username?.trim()) {
+    Message.warning('请输入登录账号')
+    done(false)
+    return
+  }
+  if (loginEnabled.value && !formData.login_password && !formData.has_login_password) {
+    Message.warning('请输入登录密码')
+    done(false)
+    return
+  }
   submitting.value = true
   try {
     const data = {
       ...formData,
+      login_enabled: loginEnabled.value,
+      clear_login_credentials: !loginEnabled.value,
       mysql_config: buildMysqlConfig(),
-      db2_config: buildDb2Config()
+      db2_config: buildDb2Config(),
+      extra_config: {
+        ...(formData.extra_config || {}),
+        ignore_https_errors: ignoreHttpsErrors.value,
+      },
     }
     if (isEdit.value && currentConfig.value) {
       await envConfigApi.update(currentConfig.value.id, data)

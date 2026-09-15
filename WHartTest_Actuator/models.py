@@ -27,10 +27,15 @@ class UiSocketEnum:
     PAGE_STEPS = 'u_page_steps'
     TEST_CASE = 'u_test_case'
     TEST_CASE_BATCH = 'u_test_case_batch'
+    AI_GENERATION = 'u_ai_generation'
+    AI_GENERATION_ACK = 'u_ai_generation_ack'
+    AI_GENERATION_RESULT = 'u_ai_generation_result'
+    ELEMENT_MAP_MANUAL_CAPTURE = 'u_element_map_manual_capture'
     STOP_EXECUTION = 'u_stop_execution'
     STEP_RESULT = 'u_step_result'
     CASE_RESULT = 'u_case_result'
     SET_ACTUATOR_INFO = 't_set_actuator_info'  # 设置执行器信息
+    ACTUATOR_HEARTBEAT = 't_actuator_heartbeat'  # 执行器心跳
 
 
 class QueueModel(BaseModel):

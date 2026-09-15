@@ -22,6 +22,9 @@ playwright_datas, playwright_binaries, playwright_hiddenimports = collect_all('p
 pydantic_datas, pydantic_binaries, pydantic_hiddenimports = collect_all('pydantic')
 pydantic_core_datas, pydantic_core_binaries, pydantic_core_hiddenimports = collect_all('pydantic_core')
 
+# Collect OCR runtime dependencies used by image captcha resolution.
+ddddocr_datas, ddddocr_binaries, ddddocr_hiddenimports = collect_all('ddddocr')
+
 # 收集完整 PySide6（确保 GUI 功能正常）
 pyside6_datas, pyside6_binaries, pyside6_hiddenimports = collect_all('PySide6')
 shiboken6_datas, shiboken6_binaries, shiboken6_hiddenimports = collect_all('shiboken6')
@@ -40,6 +43,25 @@ for sp in site_packages_list:
     for pyd in glob.glob(f"{sp}/*mypyc*.so"):
         mypyc_binaries.append((pyd, '.'))
 
+use_upx = sys.platform != 'darwin'
+
+datas = [
+    ('config.example.toml', '.'),
+    *playwright_datas,
+    *pydantic_datas,
+    *pydantic_core_datas,
+    *ddddocr_datas,
+    *pyside6_datas,
+    *shiboken6_datas,
+    *httpx_datas,
+    *httpcore_datas,
+]
+
+# 可选 logo：项目里没有该文件时，GUI 会自动回退为默认绘制
+logo_path = Path('data/WHartTest.png')
+if logo_path.exists():
+    datas.append((str(logo_path), 'data'))
+
 a = Analysis(
     ['main.py'],
     pathex=[],
@@ -47,23 +69,14 @@ a = Analysis(
         playwright_binaries + 
         pydantic_binaries + 
         pydantic_core_binaries + 
+        ddddocr_binaries +
         pyside6_binaries + 
         shiboken6_binaries + 
         httpx_binaries +
         httpcore_binaries +
         mypyc_binaries
     ),
-    datas=[
-        ('config.example.toml', '.'),
-        ('data/WHartTest.png', 'data'),  # 图标文件
-        *playwright_datas,
-        *pydantic_datas,
-        *pydantic_core_datas,
-        *pyside6_datas,
-        *shiboken6_datas,
-        *httpx_datas,
-        *httpcore_datas,
-    ],
+    datas=datas,
     hiddenimports=[
         # Playwright 相关
         'playwright',
@@ -78,6 +91,8 @@ a = Analysis(
         'pydantic_core',
         *pydantic_hiddenimports,
         *pydantic_core_hiddenimports,
+        'ddddocr',
+        *ddddocr_hiddenimports,
         
         # PySide6 完整模块
         *pyside6_hiddenimports,
@@ -118,11 +133,8 @@ a = Analysis(
         # 排除不需要的大型模块
         'tkinter',
         'matplotlib',
-        'numpy',
         'pandas',
         'scipy',
-        'PIL',
-        'cv2',
     ],
     noarchive=False,
     optimize=0,
@@ -139,8 +151,8 @@ exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
-    console=True,
+    upx=use_upx,
+    console=sys.platform != 'darwin',
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
@@ -154,7 +166,15 @@ coll = COLLECT(
     a.binaries,
     a.datas,
     strip=False,
-    upx=True,
+    upx=use_upx,
     upx_exclude=[],
     name='WHartTest_Actuator',
 )
+
+if sys.platform == 'darwin':
+    app = BUNDLE(
+        coll,
+        name='WHartTest_Actuator.app',
+        icon=None,
+        bundle_identifier='com.wharttest.actuator',
+    )

@@ -496,3 +496,158 @@ class UiEnvironmentConfig(models.Model):
         if self.is_default:
             UiEnvironmentConfig.objects.filter(project=self.project, is_default=True).exclude(pk=self.pk).update(is_default=False)
         super().save(*args, **kwargs)
+
+
+class UiElementMap(models.Model):
+    """MCP/Playwright 探索沉淀的页面状态元素地图。"""
+    STATUS_CHOICES = [
+        ('draft', _('草稿')),
+        ('confirmed', _('已确认')),
+        ('archived', _('已归档')),
+    ]
+
+    project = models.ForeignKey(
+        Project, on_delete=models.CASCADE,
+        related_name='ui_element_maps', verbose_name=_('所属项目')
+    )
+    environment_config = models.ForeignKey(
+        UiEnvironmentConfig, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='element_maps', verbose_name=_('环境配置')
+    )
+    parent_map = models.ForeignKey(
+        'self', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='derived_versions', verbose_name=_('父版本地图')
+    )
+    name = models.CharField(_('地图名称'), max_length=128)
+    version = models.PositiveIntegerField(_('版本号'), default=1)
+    version_group = models.CharField(_('版本组'), max_length=64, blank=True, default='')
+    role_key = models.CharField(_('角色标识'), max_length=128, blank=True, default='default')
+    permission_key = models.CharField(_('权限标识'), max_length=128, blank=True, default='default')
+    base_url = models.TextField(_('基础 URL'), blank=True, null=True)
+    status = models.CharField(_('状态'), max_length=20, choices=STATUS_CHOICES, default='draft')
+    map_json = models.JSONField(_('元素地图'), default=dict, blank=True)
+    map_hash = models.CharField(_('地图 Hash'), max_length=64, blank=True, default='')
+    baseline_hash = models.CharField(_('定位基线 Hash'), max_length=64, blank=True, default='')
+    diff_summary = models.JSONField(_('版本差异摘要'), default=dict, blank=True)
+    stale_status = models.CharField(_('过期状态'), max_length=20, blank=True, default='current')
+    stale_reason = models.TextField(_('过期原因'), blank=True, default='')
+    coverage_summary = models.JSONField(_('覆盖统计'), default=dict, blank=True)
+    low_confidence_items = models.JSONField(_('低置信度元素'), default=list, blank=True)
+    risk_items = models.JSONField(_('高风险入口'), default=list, blank=True)
+    creator = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True,
+        related_name='created_ui_element_maps', verbose_name=_('创建人')
+    )
+    confirmed_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='confirmed_ui_element_maps', verbose_name=_('确认人')
+    )
+    created_at = models.DateTimeField(_('创建时间'), auto_now_add=True)
+    updated_at = models.DateTimeField(_('更新时间'), auto_now=True)
+
+    class Meta:
+        verbose_name = _('UI 元素地图')
+        verbose_name_plural = _('UI 元素地图')
+        ordering = ['-updated_at', '-id']
+        db_table = 'ui_element_map'
+
+    def __str__(self):
+        return f"{self.project.name} - {self.name} v{self.version}"
+
+
+class UiAiGenerationTask(models.Model):
+    """Playwright MCP 全能力生成、验证与修复任务。"""
+    STATUS_CHOICES = [
+        ('pending', _('待执行')),
+        ('running', _('执行中')),
+        ('success', _('成功')),
+        ('failed', _('失败')),
+        ('cancelled', _('已取消')),
+    ]
+    SOURCE_TYPE_CHOICES = [
+        ('natural_language', _('自然语言')),
+        ('gherkin', _('Gherkin')),
+        ('testcase', _('测试用例')),
+        ('requirement', _('需求')),
+    ]
+    FAILURE_CATEGORY_CHOICES = [
+        ('', _('未分类')),
+        ('locator', _('定位失败')),
+        ('timeout', _('等待超时')),
+        ('assertion', _('断言失败')),
+        ('data', _('测试数据问题')),
+        ('permission', _('权限问题')),
+        ('environment', _('环境问题')),
+        ('product_defect', _('产品缺陷')),
+        ('llm', _('LLM 生成问题')),
+        ('unknown', _('未知问题')),
+    ]
+    DISPATCH_STATUS_CHOICES = [
+        ('pending', _('待下发')),
+        ('sent', _('已下发')),
+        ('acked', _('已入队')),
+        ('duplicate', _('重复入队')),
+        ('completed', _('已完成')),
+        ('failed', _('下发失败')),
+    ]
+
+    project = models.ForeignKey(
+        Project, on_delete=models.CASCADE,
+        related_name='ui_ai_generation_tasks', verbose_name=_('所属项目')
+    )
+    environment_config = models.ForeignKey(
+        UiEnvironmentConfig, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='ai_generation_tasks', verbose_name=_('环境配置')
+    )
+    element_map = models.ForeignKey(
+        UiElementMap, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='ai_generation_tasks', verbose_name=_('元素地图')
+    )
+    name = models.CharField(_('任务名称'), max_length=255)
+    source_type = models.CharField(_('来源类型'), max_length=32, choices=SOURCE_TYPE_CHOICES, default='natural_language')
+    source_requirement = models.TextField(_('自然语言需求'), blank=True, null=True)
+    gherkin = models.TextField(_('Gherkin'), blank=True, null=True)
+    target_url = models.TextField(_('目标 URL'), blank=True, null=True)
+    target_module = models.CharField(_('目标模块'), max_length=255, blank=True, null=True)
+    safety_policy = models.JSONField(_('安全边界策略'), default=dict, blank=True)
+    status = models.CharField(_('状态'), max_length=20, choices=STATUS_CHOICES, default='pending')
+    actuator_id = models.CharField(_('执行器 ID'), max_length=128, blank=True, null=True)
+    dispatch_id = models.CharField(_('最近分发 ID'), max_length=128, blank=True, null=True)
+    dispatch_status = models.CharField(
+        _('分发状态'), max_length=20, choices=DISPATCH_STATUS_CHOICES, default='pending'
+    )
+    dispatch_attempts = models.PositiveSmallIntegerField(_('分发次数'), default=0)
+    last_dispatched_at = models.DateTimeField(_('最近下发时间'), null=True, blank=True)
+    last_ack_at = models.DateTimeField(_('最近 ACK 时间'), null=True, blank=True)
+    last_dispatch_error = models.TextField(_('最近分发错误'), blank=True, null=True)
+    test_plan = models.JSONField(_('测试计划'), default=dict, blank=True)
+    mcp_observations = models.JSONField(_('MCP 观察记录'), default=list, blank=True)
+    element_map_snapshot = models.JSONField(_('元素地图快照'), default=dict, blank=True)
+    generated_case = models.JSONField(_('生成的执行步骤'), default=dict, blank=True)
+    generated_script = models.TextField(_('生成的 Playwright 脚本'), blank=True, null=True)
+    generated_script_hash = models.CharField(_('脚本 Hash'), max_length=64, blank=True, null=True)
+    verification_result = models.JSONField(_('验证结果'), default=dict, blank=True)
+    repair_history = models.JSONField(_('修复历史'), default=list, blank=True)
+    failure_category = models.CharField(
+        _('失败分类'), max_length=32, choices=FAILURE_CATEGORY_CHOICES, blank=True, default=''
+    )
+    max_repair_rounds = models.PositiveSmallIntegerField(_('最大修复轮数'), default=2)
+    current_repair_round = models.PositiveSmallIntegerField(_('当前修复轮数'), default=0)
+    error_message = models.TextField(_('错误信息'), blank=True, null=True)
+    creator = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True,
+        related_name='created_ui_ai_generation_tasks', verbose_name=_('创建人')
+    )
+    started_at = models.DateTimeField(_('开始时间'), null=True, blank=True)
+    completed_at = models.DateTimeField(_('完成时间'), null=True, blank=True)
+    created_at = models.DateTimeField(_('创建时间'), auto_now_add=True)
+    updated_at = models.DateTimeField(_('更新时间'), auto_now=True)
+
+    class Meta:
+        verbose_name = _('AI UI 生成任务')
+        verbose_name_plural = _('AI UI 生成任务')
+        ordering = ['-created_at']
+        db_table = 'ui_ai_generation_task'
+
+    def __str__(self):
+        return f"{self.project.name} - {self.name}"

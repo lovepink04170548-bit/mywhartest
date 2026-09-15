@@ -1,0 +1,120 @@
+name: Build macOS Actuator Package
+
+on:
+  push:
+    branches:
+      - develop
+      - master
+    tags:
+      - 'v*'
+    paths:
+      - WHartTest_Actuator/**
+      - .github/workflows/build-macos-package.yml
+  workflow_dispatch:
+    inputs:
+      target_arch:
+        description: 'PyInstaller target architecture'
+        required: false
+        default: ''
+        type: string
+
+jobs:
+  build:
+    name: Build macOS .pkg
+    runs-on: macos-latest
+    timeout-minutes: 90
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: WHartTest_Actuator/uv.lock
+
+      - name: Install actuator dependencies
+        working-directory: WHartTest_Actuator
+        run: uv sync --locked
+
+      - name: Install Playwright Chromium
+        working-directory: WHartTest_Actuator
+        run: uv run python -m playwright install chromium
+
+      - name: Build macOS app and installer
+        working-directory: WHartTest_Actuator
+        env:
+          MACOS_TARGET_ARCH: ${{ inputs.target_arch }}
+        run: uv run python build_macos.py
+
+      - name: Generate checksums
+        working-directory: WHartTest_Actuator
+        run: |
+          shasum -a 256 dist/WHartTest_Actuator_MacOS.pkg > dist/WHartTest_Actuator_MacOS.pkg.sha256
+          shasum -a 256 dist/WHartTest_Actuator_MacOS.zip > dist/WHartTest_Actuator_MacOS.zip.sha256
+
+      - name: Verify package outputs
+        working-directory: WHartTest_Actuator
+        run: |
+          test -s dist/WHartTest_Actuator_MacOS.pkg
+          test -s dist/WHartTest_Actuator_MacOS.zip
+          pkgutil --check-signature dist/WHartTest_Actuator_MacOS.pkg || true
+          file dist/WHartTest_Actuator_MacOS.pkg
+          du -h dist/WHartTest_Actuator_MacOS.pkg dist/WHartTest_Actuator_MacOS.zip
+
+      - name: Upload macOS package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: WHartTest-Actuator-macOS-${{ github.sha }}
+          path: |
+            WHartTest_Actuator/dist/WHartTest_Actuator_MacOS.pkg
+            WHartTest_Actuator/dist/WHartTest_Actuator_MacOS.pkg.sha256
+            WHartTest_Actuator/dist/WHartTest_Actuator_MacOS.zip
+            WHartTest_Actuator/dist/WHartTest_Actuator_MacOS.zip.sha256
+          if-no-files-found: error
+          retention-days: 30
+
+  release:
+    name: Publish macOS .pkg Release Asset
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download macOS package artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: WHartTest-Actuator-macOS-${{ github.sha }}
+          path: release-assets
+
+      - name: Create or update GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
+            gh release upload "$TAG_NAME" \
+              release-assets/WHartTest_Actuator_MacOS.pkg \
+              release-assets/WHartTest_Actuator_MacOS.pkg.sha256 \
+              release-assets/WHartTest_Actuator_MacOS.zip \
+              release-assets/WHartTest_Actuator_MacOS.zip.sha256 \
+              --clobber
+          else
+            gh release create "$TAG_NAME" \
+              release-assets/WHartTest_Actuator_MacOS.pkg \
+              release-assets/WHartTest_Actuator_MacOS.pkg.sha256 \
+              release-assets/WHartTest_Actuator_MacOS.zip \
+              release-assets/WHartTest_Actuator_MacOS.zip.sha256 \
+              --title "WHartTest $TAG_NAME" \
+              --generate-notes
+          fi

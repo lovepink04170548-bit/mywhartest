@@ -33,7 +33,7 @@ WS_URL = "ws://127.0.0.1:8000/ws/ui/web/"
 
 # 测试用户凭据
 TEST_USERNAME = "admin"
-TEST_PASSWORD = "admin123"
+TEST_PASSWORD = "admin123456"
 TEST_PROJECT_ID = 4  # UI自动化测试项目
 
 

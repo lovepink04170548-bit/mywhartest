@@ -70,6 +70,7 @@ services:
       - ./data:/app/data
       - backend-static:/app/static
       - ./WHartTest_Skills:/app/bundled_skills:ro
+      - ./WHartTest_Actuator/dist:/app/actuator-packages:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
@@ -95,6 +96,14 @@ services:
       - DJANGO_ADMIN_USERNAME=${DJANGO_ADMIN_USERNAME:-admin}
       - DJANGO_ADMIN_EMAIL=${DJANGO_ADMIN_EMAIL:-admin@example.com}
       - DJANGO_ADMIN_PASSWORD=${DJANGO_ADMIN_PASSWORD:-admin123456}
+      - UI_ACTUATOR_PACKAGE_WINDOWS_URL=${UI_ACTUATOR_PACKAGE_WINDOWS_URL}
+      - UI_ACTUATOR_PACKAGE_WINDOWS_SHA256=${UI_ACTUATOR_PACKAGE_WINDOWS_SHA256}
+      - UI_ACTUATOR_PACKAGE_WINDOWS_FILE_NAME=${UI_ACTUATOR_PACKAGE_WINDOWS_FILE_NAME:-WHartTest_Actuator_Installer.exe}
+      - UI_ACTUATOR_PACKAGE_MACOS_FILE_NAME=${UI_ACTUATOR_PACKAGE_MACOS_FILE_NAME:-WHartTest_Actuator_MacOS.pkg}
+      - UI_ACTUATOR_PACKAGE_MACOS_SHA256=${UI_ACTUATOR_PACKAGE_MACOS_SHA256}
+      - UI_ACTUATOR_PACKAGE_DIR=${UI_ACTUATOR_PACKAGE_DIR:-/app/actuator-packages}
+      - UI_ACTUATOR_PACKAGE_LINUX_URL=${UI_ACTUATOR_PACKAGE_LINUX_URL}
+      - UI_ACTUATOR_PACKAGE_MACOS_URL=${UI_ACTUATOR_PACKAGE_MACOS_URL}
       # Celery配置
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0

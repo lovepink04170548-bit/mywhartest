@@ -115,33 +115,55 @@ def extract_json_from_response(content: str) -> Optional[dict]:
     if not content:
         return None
 
-    content = content.strip()
+    content = content.strip().lstrip("\ufeff")
+    content = "".join(
+        char
+        for char in content
+        if char in "\t\n\r" or ord(char) >= 32
+    )
+
+    decoder = json.JSONDecoder()
+
+    def try_parse_json(raw: str) -> Optional[dict]:
+        candidate = (raw or "").strip().lstrip("\ufeff")
+        if not candidate:
+            return None
+        try:
+            parsed = json.loads(candidate)
+            return parsed if isinstance(parsed, dict) else None
+        except json.JSONDecodeError:
+            pass
+        try:
+            parsed, _ = decoder.raw_decode(candidate)
+            return parsed if isinstance(parsed, dict) else None
+        except json.JSONDecodeError:
+            return None
 
     # 策略1: 尝试 ```json ... ``` 代码块格式
     json_block_match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", content)
     if json_block_match:
-        try:
-            return json.loads(json_block_match.group(1))
-        except json.JSONDecodeError:
-            pass
+        parsed = try_parse_json(json_block_match.group(1))
+        if parsed is not None:
+            return parsed
 
     # 策略2: 直接解析整个内容（裸 JSON）
-    try:
-        return json.loads(content)
-    except json.JSONDecodeError:
-        pass
+    parsed = try_parse_json(content)
+    if parsed is not None:
+        return parsed
 
     # 策略3: 查找第一个 { 到最后一个 } 之间的内容
     first_brace = content.find("{")
     last_brace = content.rfind("}")
     if first_brace != -1 and last_brace != -1 and last_brace > first_brace:
-        try:
-            return json.loads(content[first_brace : last_brace + 1])
-        except json.JSONDecodeError:
-            pass
+        parsed = try_parse_json(content[first_brace : last_brace + 1])
+        if parsed is not None:
+            return parsed
 
     # 策略4: 尝试匹配平衡的 JSON 对象
     if first_brace != -1:
+        parsed = try_parse_json(content[first_brace:])
+        if parsed is not None:
+            return parsed
         depth = 0
         in_string = False
         escape_next = False
@@ -161,12 +183,18 @@ def extract_json_from_response(content: str) -> Optional[dict]:
                 elif char == "}":
                     depth -= 1
                     if depth == 0:
-                        try:
-                            return json.loads(content[first_brace : i + 1])
-                        except json.JSONDecodeError:
+                        parsed = try_parse_json(content[first_brace : i + 1])
+                        if parsed is not None:
+                            return parsed
+                        else:
                             break
 
-    logger.warning(f"无法从响应中提取 JSON，响应前200字符: {content[:200]}")
+    logger.warning(
+        "无法从响应中提取 JSON，响应长度=%s，前200字符=%r，后200字符=%r",
+        len(content),
+        content[:200],
+        content[-200:],
+    )
     return None
 
 

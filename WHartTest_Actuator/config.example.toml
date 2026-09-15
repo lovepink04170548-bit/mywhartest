@@ -12,8 +12,12 @@ api_url = "http://127.0.0.1:8000"
 use_gui = true
 # API认证用户名（仅 use_gui=false 时有效）
 api_username = "admin"
-# API认证密码（仅 use_gui=false 时有效）
-api_password = "admin123"
+# API认证密码（仅 use_gui=false 时有效；GUI 登录会预填该值）
+api_password = "admin123456"
+# 执行器注册令牌（生产/内网部署建议配置）
+# registration_token = "replace-with-your-token"
+# 心跳间隔（秒）
+# heartbeat_interval = 30
 
 [actuator]
 # 执行器名称（可选，默认自动生成）
@@ -34,6 +38,8 @@ user_data_dir = "./data/browser"
 launch_timeout = 30
 # 操作超时（秒）
 action_timeout = 30
+# 忽略 HTTPS 自签/不可信证书错误
+ignore_https_errors = true
 
 [execution]
 # 失败重试次数
@@ -56,6 +62,27 @@ screenshots = true
 snapshots = true
 # 是否记录源代码
 sources = false
+
+[mcp]
+# MCP provider:
+# playwright-native = 本地 Playwright 原生 API + MCP 风格元素地图（默认，稳定优先）
+# official-playwright-mcp = 官方 Playwright MCP server tool 协议（实验通道，需要单独启用）
+provider = "playwright-native"
+# provider=playwright-native 时不连接官方 MCP server；provider=official-playwright-mcp 时可改为 http。
+transport = "stdio"
+command = "npx"
+args = ["-y", "@playwright/mcp@latest", "--port", "8931", "--host", "127.0.0.1", "--caps=vision,pdf,devtools", "--headless", "--ignore-https-errors"]
+# cwd = ""
+# 官方 MCP server 地址，provider=official-playwright-mcp 且 transport=http/sse 时使用
+server_url = "http://127.0.0.1:8931/mcp"
+
+[typescript_spec]
+# AI 生成 TypeScript Playwright spec 后，执行器会尝试真实运行 playwright test。
+enabled = true
+timeout = 120
+# 本地未找到 playwright CLI 时是否允许 fallback 到 npx playwright test。
+allow_npx = true
+# command = "./node_modules/.bin/playwright"
 
 [logging]
 # 日志级别: DEBUG, INFO, WARNING, ERROR

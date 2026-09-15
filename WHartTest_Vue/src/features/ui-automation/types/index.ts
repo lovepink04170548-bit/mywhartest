@@ -238,6 +238,132 @@ export interface UiBatchExecutionRecord {
   execution_records?: UiExecutionRecord[]
 }
 
+export type ElementMapStatus = 'draft' | 'confirmed' | 'archived'
+export type AiGenerationTaskStatus = 'pending' | 'running' | 'success' | 'failed' | 'cancelled'
+export type AiExecutionMode = 'contract_planner' | 'runtime_agent'
+export type AiGenerationDispatchStatus = 'pending' | 'sent' | 'acked' | 'duplicate' | 'completed' | 'failed'
+export type AiGenerationSourceType = 'natural_language' | 'gherkin' | 'testcase' | 'requirement'
+
+export interface UiElementMap extends TimeStampFields {
+  id: number
+  project: number
+  project_name?: string
+  environment_config?: number | null
+  environment_name?: string
+  parent_map?: number | null
+  name: string
+  version: number
+  version_group?: string
+  role_key?: string
+  permission_key?: string
+  base_url?: string
+  status: ElementMapStatus
+  map_json: Record<string, unknown>
+  map_hash?: string
+  baseline_hash?: string
+  diff_summary?: Record<string, unknown>
+  stale_status?: string
+  stale_reason?: string
+  coverage_summary: Record<string, unknown>
+  low_confidence_items: unknown[]
+  risk_items: unknown[]
+  page_count?: number
+  element_count?: number
+  creator: number | null
+  creator_name?: string
+  confirmed_by?: number | null
+  confirmed_by_name?: string
+}
+
+export interface UiAiSafetyPolicy {
+  url_allowlist?: string[]
+  url_blocklist?: string[]
+  dangerous_action_keywords?: string[]
+  require_confirmation_keywords?: string[]
+  max_steps?: number
+  max_pages?: number
+  max_repair_rounds?: number
+  allow_form_submit?: boolean
+  allow_destructive_actions?: boolean
+  headless?: boolean
+  [key: string]: unknown
+}
+
+export interface UiAiGenerationTask extends TimeStampFields {
+  id: number
+  project: number
+  project_name?: string
+  environment_config?: number | null
+  environment_name?: string
+  element_map?: number | null
+  element_map_name?: string
+  name: string
+  source_type: AiGenerationSourceType
+  source_requirement?: string
+  gherkin?: string
+  target_url?: string
+  target_module?: string
+  safety_policy: UiAiSafetyPolicy
+  status: AiGenerationTaskStatus
+  execution_mode?: AiExecutionMode
+  actuator_id?: string
+  dispatch_id?: string
+  dispatch_status?: AiGenerationDispatchStatus
+  dispatch_attempts?: number
+  last_dispatched_at?: string
+  last_ack_at?: string
+  last_dispatch_error?: string
+  test_plan: Record<string, unknown>
+  mcp_observations: unknown[]
+  element_map_snapshot: Record<string, unknown>
+  generated_case: Record<string, unknown>
+  generated_script?: string
+  generated_script_hash?: string
+  verification_result: Record<string, unknown>
+  repair_history: unknown[]
+  failure_category?: string
+  max_repair_rounds: number
+  current_repair_round: number
+  review_queue_count?: number
+  payload_summary?: {
+    lazy?: boolean
+    fields?: Record<string, { loaded?: boolean; approx_bytes?: number | null }>
+    [key: string]: unknown
+  }
+  error_message?: string
+  creator: number | null
+  creator_name?: string
+  started_at?: string
+  completed_at?: string
+}
+
+export interface UiAiReviewQueueItem {
+  type: string
+  status: 'pending' | 'approved' | 'rejected' | string
+  step_sort?: number
+  page_key?: string
+  element_key?: string
+  target_name?: string
+  old_locator?: Record<string, unknown>
+  new_locator?: Record<string, unknown>
+  failure_category?: string
+  message?: string
+  reason?: string
+  reviewed_at?: string
+  reviewed_by?: string
+  review_comment?: string
+  applied_to_element_map?: boolean
+  [key: string]: unknown
+}
+
+export type UiAiGenerationTaskForm = Pick<
+  UiAiGenerationTask,
+  'project' | 'name' | 'source_type'
+> & Partial<Pick<
+  UiAiGenerationTask,
+  'environment_config' | 'element_map' | 'source_requirement' | 'gherkin' | 'target_url' | 'target_module' | 'safety_policy' | 'max_repair_rounds' | 'execution_mode'
+>>
+
 /** Trace 操作记录 */
 export interface TraceAction {
   action_id: string
@@ -360,6 +486,11 @@ export interface UiEnvironmentConfig extends TimeStampFields {
   mysql_config?: Record<string, unknown>
   db2_config?: Record<string, unknown>
   extra_config?: Record<string, unknown>
+  login_enabled?: boolean
+  login_username?: string
+  login_password?: string
+  has_login_password?: boolean
+  clear_login_credentials?: boolean
   is_default: boolean
   creator: number | null
   creator_name?: string

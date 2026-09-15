@@ -38,12 +38,15 @@ PandaWiki-skill/
 .cache/
 .npm/
 .yarn/
+.agents/
+.codex/
+WHartTest_Vue/.ai_ts_specs/
 
 # Build artifacts
 build/
 dist/
 out/
-PandaWiki-skill/
+WHartTest_Actuator/config.toml
 # Dependencies (handled by subdirectories, but backup)
 node_modules/
 nltk_data/
@@ -72,4 +75,3 @@ AGENTS.md
 WHartTest_IDEA_Plugin/
 WHartTest_VSCode_Extension/
 docx-editor/
-
