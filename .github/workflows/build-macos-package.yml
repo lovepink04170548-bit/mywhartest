@@ -1,8 +1,12 @@
 name: Build macOS Actuator Package
 
 on:
+  release:
+    types:
+      - published
   push:
     branches:
+      - main
       - develop
       - master
     tags:
@@ -12,6 +16,11 @@ on:
       - .github/workflows/build-macos-package.yml
   workflow_dispatch:
     inputs:
+      release_tag:
+        description: 'Existing release tag to upload assets to, for example v1.0.0. Leave empty to build only.'
+        required: false
+        default: ''
+        type: string
       target_arch:
         description: 'PyInstaller target architecture'
         required: false
@@ -29,6 +38,27 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name || inputs.release_tag || github.ref }}
+
+      - name: Resolve package metadata
+        id: package
+        shell: bash
+        env:
+          EVENT_RELEASE_TAG: ${{ github.event.release.tag_name }}
+          INPUT_RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          tag_name="${EVENT_RELEASE_TAG:-${INPUT_RELEASE_TAG:-}}"
+          if [ -z "$tag_name" ] && [ "${GITHUB_REF_TYPE:-}" = "tag" ]; then
+            tag_name="$GITHUB_REF_NAME"
+          fi
+          package_version="${tag_name#v}"
+          if [ -z "$package_version" ]; then
+            package_version="1.0.0"
+          fi
+          echo "tag_name=$tag_name" >> "$GITHUB_OUTPUT"
+          echo "package_version=$package_version" >> "$GITHUB_OUTPUT"
+          echo "Building package version: $package_version"
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -53,6 +83,7 @@ jobs:
         working-directory: WHartTest_Actuator
         env:
           MACOS_TARGET_ARCH: ${{ inputs.target_arch }}
+          MACOS_PACKAGE_VERSION: ${{ steps.package.outputs.package_version }}
         run: uv run python build_macos.py
 
       - name: Generate checksums
@@ -84,7 +115,7 @@ jobs:
 
   release:
     name: Publish macOS .pkg Release Asset
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: github.event_name == 'release' || startsWith(github.ref, 'refs/tags/v') || inputs.release_tag != ''
     needs: build
     runs-on: ubuntu-latest
     permissions:
@@ -100,8 +131,12 @@ jobs:
       - name: Create or update GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG_NAME: ${{ github.ref_name }}
+          TAG_NAME: ${{ github.event.release.tag_name || inputs.release_tag || github.ref_name }}
         run: |
+          if [ -z "$TAG_NAME" ]; then
+            echo "No release tag was resolved; skipping upload."
+            exit 1
+          fi
           if gh release view "$TAG_NAME" >/dev/null 2>&1; then
             gh release upload "$TAG_NAME" \
               release-assets/WHartTest_Actuator_MacOS.pkg \
