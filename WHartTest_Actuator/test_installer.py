@@ -106,6 +106,13 @@ class MacOSBuildTests(unittest.TestCase):
             self.assertIn("actuator.spec", captured["command"])
             self.assertNotIn("--specpath", captured["command"])
 
+    def test_macos_zip_fallback_can_be_disabled_for_release_upload_size_limit(self):
+        with patch.dict(os.environ, {"MACOS_BUILD_ZIP": "0"}):
+            self.assertFalse(build_macos.should_build_zip())
+
+        with patch.dict(os.environ, {"MACOS_BUILD_ZIP": "1"}):
+            self.assertTrue(build_macos.should_build_zip())
+
 
 class MainStartupTests(unittest.TestCase):
     def test_gui_login_opens_before_browser_check(self):

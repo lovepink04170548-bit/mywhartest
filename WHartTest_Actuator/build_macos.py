@@ -9,8 +9,8 @@ The primary installer is:
 
     dist/WHartTest_Actuator_MacOS.pkg
 
-A zip fallback is also generated for environments that do not allow pkg
-installation.
+A zip fallback can also be generated for environments that do not allow pkg
+installation. Set MACOS_BUILD_ZIP=0 to skip the fallback archive.
 """
 
 from __future__ import annotations
@@ -126,6 +126,10 @@ def zip_release() -> None:
             archive.write(source_path, arcname=str(archive_name))
 
 
+def should_build_zip() -> bool:
+    return os.environ.get('MACOS_BUILD_ZIP', '1').strip().lower() not in {'0', 'false', 'no'}
+
+
 def create_pkg_postinstall() -> None:
     postinstall = PKG_SCRIPTS / 'postinstall'
     postinstall.parent.mkdir(parents=True, exist_ok=True)
@@ -224,15 +228,20 @@ def main() -> None:
     clean_build()
     app_path = run_pyinstaller()
     stage_release(app_path)
-    zip_release()
+    build_zip = should_build_zip()
+    if build_zip:
+        zip_release()
     build_pkg(app_path)
 
     print('=' * 60)
     print(f'发布目录: {RELEASE_DIR}')
-    print(f'压缩包: {ARCHIVE_PATH}')
+    if build_zip:
+        print(f'压缩包: {ARCHIVE_PATH}')
+        print(f'ZIP SHA256: {file_sha256(ARCHIVE_PATH)}')
+    else:
+        print('压缩包: 已跳过（MACOS_BUILD_ZIP=0）')
     print(f'安装包: {PKG_PATH}')
     print(f'PKG SHA256: {file_sha256(PKG_PATH)}')
-    print(f'ZIP SHA256: {file_sha256(ARCHIVE_PATH)}')
     print('用户下载 .pkg 后双击安装，安装完成后会尝试自动启动执行器。')
     print('=' * 60)
 

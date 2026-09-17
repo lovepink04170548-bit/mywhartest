@@ -89,22 +89,21 @@ jobs:
         env:
           MACOS_TARGET_ARCH: ${{ inputs.target_arch }}
           MACOS_PACKAGE_VERSION: ${{ steps.package.outputs.package_version }}
+          MACOS_BUILD_ZIP: '0'
         run: uv run python build_macos.py
 
       - name: Generate checksums
         working-directory: WHartTest_Actuator
         run: |
           shasum -a 256 dist/WHartTest_Actuator_MacOS.pkg > dist/WHartTest_Actuator_MacOS.pkg.sha256
-          shasum -a 256 dist/WHartTest_Actuator_MacOS.zip > dist/WHartTest_Actuator_MacOS.zip.sha256
 
       - name: Verify package outputs
         working-directory: WHartTest_Actuator
         run: |
           test -s dist/WHartTest_Actuator_MacOS.pkg
-          test -s dist/WHartTest_Actuator_MacOS.zip
           pkgutil --check-signature dist/WHartTest_Actuator_MacOS.pkg || true
           file dist/WHartTest_Actuator_MacOS.pkg
-          du -h dist/WHartTest_Actuator_MacOS.pkg dist/WHartTest_Actuator_MacOS.zip
+          du -h dist/WHartTest_Actuator_MacOS.pkg
 
       - name: Upload macOS package artifact
         uses: actions/upload-artifact@v4
@@ -113,8 +112,6 @@ jobs:
           path: |
             WHartTest_Actuator/dist/WHartTest_Actuator_MacOS.pkg
             WHartTest_Actuator/dist/WHartTest_Actuator_MacOS.pkg.sha256
-            WHartTest_Actuator/dist/WHartTest_Actuator_MacOS.zip
-            WHartTest_Actuator/dist/WHartTest_Actuator_MacOS.zip.sha256
           if-no-files-found: error
           retention-days: 30
 
@@ -147,15 +144,11 @@ jobs:
             gh release upload "$TAG_NAME" \
               release-assets/WHartTest_Actuator_MacOS.pkg \
               release-assets/WHartTest_Actuator_MacOS.pkg.sha256 \
-              release-assets/WHartTest_Actuator_MacOS.zip \
-              release-assets/WHartTest_Actuator_MacOS.zip.sha256 \
               --clobber
           else
             gh release create "$TAG_NAME" \
               release-assets/WHartTest_Actuator_MacOS.pkg \
               release-assets/WHartTest_Actuator_MacOS.pkg.sha256 \
-              release-assets/WHartTest_Actuator_MacOS.zip \
-              release-assets/WHartTest_Actuator_MacOS.zip.sha256 \
               --title "WHartTest $TAG_NAME" \
               --generate-notes
           fi
