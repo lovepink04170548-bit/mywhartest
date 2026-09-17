@@ -39,7 +39,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.release.tag_name || inputs.release_tag || github.ref }}
+          ref: ${{ github.event.release.tag_name || github.ref }}
+
+      - name: Show checkout revision
+        run: |
+          git rev-parse --short HEAD
+          git log -1 --oneline
 
       - name: Resolve package metadata
         id: package
