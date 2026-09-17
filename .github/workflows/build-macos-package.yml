@@ -80,16 +80,13 @@ jobs:
         working-directory: WHartTest_Actuator
         run: uv sync --locked
 
-      - name: Install Playwright Chromium
-        working-directory: WHartTest_Actuator
-        run: uv run python -m playwright install chromium
-
       - name: Build macOS app and installer
         working-directory: WHartTest_Actuator
         env:
           MACOS_TARGET_ARCH: ${{ inputs.target_arch }}
           MACOS_PACKAGE_VERSION: ${{ steps.package.outputs.package_version }}
           MACOS_BUILD_ZIP: '0'
+          WHARTTEST_BUNDLE_BROWSER: '0'
         run: uv run python build_macos.py
 
       - name: Generate checksums

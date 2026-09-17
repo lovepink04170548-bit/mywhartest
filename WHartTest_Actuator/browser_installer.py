@@ -32,6 +32,8 @@ def get_exe_dir() -> Path:
 
 def get_browser_path() -> Path:
     """获取浏览器存储路径（相对于 exe 目录）"""
+    if getattr(sys, 'frozen', False) and sys.platform == 'darwin':
+        return get_runtime_dir() / "browsers"
     return get_exe_dir() / "browsers"
 
 

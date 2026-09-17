@@ -82,6 +82,14 @@ class InstallerTests(unittest.TestCase):
             self.assertEqual(config_path, runtime_dir / "config.toml")
             self.assertEqual(config_path.read_text(encoding="utf-8"), (install_dir / "config.toml").read_text(encoding="utf-8"))
 
+    def test_macos_frozen_browser_path_uses_writable_user_runtime_directory(self):
+        with TemporaryDirectory() as tmpdir:
+            runtime_dir = Path(tmpdir) / "Application Support" / "WHartTest" / "Actuator"
+            with patch.object(sys, 'frozen', True, create=True), \
+                    patch.object(sys, 'platform', 'darwin'), \
+                    patch.object(browser_installer, 'get_runtime_dir', return_value=runtime_dir):
+                self.assertEqual(browser_installer.get_browser_path(), runtime_dir / "browsers")
+
 
 class MacOSBuildTests(unittest.TestCase):
     def test_pyinstaller_spec_invocation_does_not_include_makespec_options(self):
