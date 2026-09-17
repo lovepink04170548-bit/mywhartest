@@ -67,8 +67,6 @@ def run_pyinstaller() -> Path:
         str(PYINSTALLER_DIST_DIR),
         '--workpath',
         str(BUILD_DIR),
-        '--specpath',
-        str(BUILD_DIR),
     ]
 
     target_arch = os.environ.get('MACOS_TARGET_ARCH', '').strip()

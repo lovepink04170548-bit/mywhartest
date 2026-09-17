@@ -1,5 +1,6 @@
 import asyncio
 import importlib
+import os
 import sys
 import types
 import unittest
@@ -9,6 +10,7 @@ from unittest.mock import patch
 
 import installer
 import browser_installer
+import build_macos
 
 
 class InstallerTests(unittest.TestCase):
@@ -79,6 +81,30 @@ class InstallerTests(unittest.TestCase):
 
             self.assertEqual(config_path, runtime_dir / "config.toml")
             self.assertEqual(config_path.read_text(encoding="utf-8"), (install_dir / "config.toml").read_text(encoding="utf-8"))
+
+
+class MacOSBuildTests(unittest.TestCase):
+    def test_pyinstaller_spec_invocation_does_not_include_makespec_options(self):
+        with TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            pyinstaller_dist_dir = tmp_path / "dist" / ".macos-pyinstaller"
+            app_path = pyinstaller_dist_dir / build_macos.APP_NAME
+            app_path.mkdir(parents=True)
+            captured: dict[str, list[str]] = {}
+
+            def fake_run(command, cwd):
+                captured["command"] = command
+                return types.SimpleNamespace(returncode=0)
+
+            with patch.object(build_macos, "PROJECT_DIR", tmp_path), \
+                    patch.object(build_macos, "PYINSTALLER_DIST_DIR", pyinstaller_dist_dir), \
+                    patch.object(build_macos, "BUILD_DIR", tmp_path / "build" / "macos"), \
+                    patch.object(build_macos.subprocess, "run", side_effect=fake_run), \
+                    patch.dict(os.environ, {"MACOS_TARGET_ARCH": ""}):
+                self.assertEqual(build_macos.run_pyinstaller(), app_path)
+
+            self.assertIn("actuator.spec", captured["command"])
+            self.assertNotIn("--specpath", captured["command"])
 
 
 class MainStartupTests(unittest.TestCase):
